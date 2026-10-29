@@ -1,4 +1,5 @@
 out/
-bazel-*
+# Bazel's convenience symlinks (anchored: scripts/bazel-build.sh must not match)
+/bazel-*
 MODULE.bazel.lock
 node_modules/
