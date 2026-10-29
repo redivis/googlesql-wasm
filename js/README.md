@@ -46,6 +46,7 @@ Parses `sql` as one statement, or as a script when `allowScript` is set (otherwi
   hasRecursiveCte: false,
   parameters: [{ name: 'start', position: null, range }],
   paths: [{ names: ['t', 'id'], range }],         // every other path expression, e.g. column references
+  identifiers: [{ name: 'id', isQuoted: false, range }], // every identifier outside table paths and parameters
 }
 ```
 
@@ -66,6 +67,8 @@ engine.analyze('SELECT t.id, UPPER(name) AS upper_name FROM `p.d.t` t WHERE id I
 ```
 
 A table's `name` is one identifier (what `` `p.d.t` `` refers to) or an array for a path through nested catalogs (what `p.d.t` refers to). Types are BigQuery type strings, including `ARRAY<...>`, `STRUCT<...>` and `RANGE<...>`; `typeFromString` and `typeToString` convert them to and from `TypeProto`. Only queries are accepted, so a DML or DDL statement fails with `Statement not supported: ...`. The language is BigQuery's: every released GoogleSQL feature, in external product mode. `engine.analyzeRaw` returns the decoded `AnalyzeResponse`.
+
+With `allowScript: true`, `sql` may hold several statements. They're analyzed in order, each `CREATE [TEMP] FUNCTION` (SQL or JavaScript) defines its function for the statements after it, and the result is the last statement's. Error locations are relative to the whole script.
 
 ### `engine.format(sql, options)`
 

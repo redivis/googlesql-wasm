@@ -36,6 +36,9 @@ export default function summarizeStatement(anyStatement, byteToCharIndex) {
 		hasRecursiveCte: false,
 		parameters: [],
 		paths: [],
+		// Every identifier (in paths, aliases, function names, ...) except those of table paths and parameters, so that a
+		//   tool can rename them without overlapping the table and parameter ranges
+		identifiers: [],
 	};
 	if (!statement) {
 		return summary;
@@ -43,6 +46,8 @@ export default function summarizeStatement(anyStatement, byteToCharIndex) {
 
 	// Path expressions that name a table, so that the walk doesn't also report them as column paths
 	const tablePathExpressions = new Set();
+	// Identifiers that are part of a table path or a parameter, which aren't reported as identifiers
+	const excludedIdentifiers = new Set();
 
 	walk(statement, (node) => {
 		switch (node.$typeName) {
@@ -50,6 +55,9 @@ export default function summarizeStatement(anyStatement, byteToCharIndex) {
 				const alias = node.alias?.identifier;
 				if (node.pathExpr) {
 					tablePathExpressions.add(node.pathExpr);
+					for (const name of node.pathExpr.names) {
+						excludedIdentifiers.add(name);
+					}
 					summary.tables.push({
 						path: node.pathExpr.names.map((name) => name.idString),
 						isQuoted: node.pathExpr.names.some((name) => name.isQuoted),
@@ -81,11 +89,23 @@ export default function summarizeStatement(anyStatement, byteToCharIndex) {
 				}
 				break;
 			case 'googlesql.ASTParameterExprProto':
+				if (node.name) {
+					excludedIdentifiers.add(node.name);
+				}
 				summary.parameters.push({
 					name: node.name?.idString ?? null,
 					position: node.name ? null : Number(node.position),
 					range: range(node, byteToCharIndex),
 				});
+				break;
+			case 'googlesql.ASTIdentifierProto':
+				if (!excludedIdentifiers.has(node)) {
+					summary.identifiers.push({
+						name: node.idString,
+						isQuoted: node.isQuoted,
+						range: range(node, byteToCharIndex),
+					});
+				}
 				break;
 			case 'googlesql.ASTPathExpressionProto':
 				if (!tablePathExpressions.has(node)) {

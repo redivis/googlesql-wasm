@@ -19,6 +19,7 @@ The `.wasm` imports only WASI (`wasi_snapshot_preview1`) functions and one Emscr
 - `googlesql_version()`: the googlesql release, as a C string.
 - `googlesql_parse(ptr, size)`: a serialized `googlesql.local_service.ParseRequest` → `ParseResponse`. Set `allow_script` to parse several statements.
 - `googlesql_analyze(ptr, size)`: a serialized `AnalyzeRequest` → `AnalyzeResponse`. Declare tables (with typed columns) in `simple_catalog` and parameters in `options.query_parameters`; the resolved statement's `output_column_list` has the result schema.
+- `googlesql_analyze_script(ptr, size)`: an `AnalyzeRequest` whose `sql_statement` is a script → the `AnalyzeResponse` of its last statement, with each `CREATE [TEMP] FUNCTION` added to the catalog for the statements after it.
 - `googlesql_format(ptr, size)`: a serialized `FormatSqlRequest` → `FormatSqlResponse`, through the lenient (comment-preserving) formatter with the request's `options` and `byte_ranges`, like the gRPC service's `LenientFormatSql`.
 - `malloc`, `free`, `googlesql_free`.
 

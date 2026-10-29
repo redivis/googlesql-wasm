@@ -30,11 +30,14 @@
 #include "googlesql/public/formatter_options.h"
 #include "googlesql/public/lenient_formatter.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/simple_catalog_util.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/serialization.pb.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/descriptor.h"
 
@@ -69,7 +72,9 @@ void* PackError(const absl::Status& status, absl::string_view sql) {
           .attach_error_location_payload = false,
           .stability = googlesql::ERROR_MESSAGE_STABILITY_UNSPECIFIED},
       sql, status);
-  return PackError(updated.message());
+  // Functions from CREATE FUNCTION statements are in the "Lazy_resolution_function" group, which googlesql puts in
+  //   front of their names in messages
+  return PackError(absl::StrReplaceAll(updated.message(), {{"Lazy_resolution_function:", ""}}));
 }
 
 void* PackProto(const google::protobuf::Message& message) {
@@ -212,6 +217,72 @@ void* googlesql_analyze(const void* request_bytes, uint32_t request_size) {
   googlesql::FileDescriptorSetMap file_descriptor_set_map;
   const absl::Status saved =
       output->resolved_statement()->SaveTo(&file_descriptor_set_map, response.mutable_resolved_statement());
+  if (!saved.ok()) return PackError(saved.message());
+  return PackProto(response);
+}
+
+// AnalyzeRequest (sql_statement holding a script) -> the AnalyzeResponse of its last statement. The statements are
+//   analyzed in order against one catalog, and each CREATE [TEMP] FUNCTION adds its function to the catalog for the
+//   statements after it, so a query can use functions defined earlier in the script. Only queries and CREATE FUNCTION
+//   statements are accepted unless the request's language options say otherwise.
+EMSCRIPTEN_KEEPALIVE
+void* googlesql_analyze_script(const void* request_bytes, uint32_t request_size) {
+  AnalyzeRequest request;
+  if (!request.ParseFromArray(request_bytes, request_size)) {
+    return PackError("Invalid AnalyzeRequest");
+  }
+  if (!request.has_sql_statement()) {
+    return PackError("AnalyzeRequest needs sql_statement");
+  }
+  const std::vector<const google::protobuf::DescriptorPool*> pools = DescriptorPools();
+  googlesql::TypeFactory type_factory;
+
+  googlesql::AnalyzerOptions options;
+  const absl::Status options_status =
+      googlesql::AnalyzerOptions::Deserialize(request.options(), pools, &type_factory, &options);
+  if (!options_status.ok()) return PackError(options_status.message());
+  if (!request.options().has_language_options()) {
+    options.set_language(DefaultLanguageOptions());
+  }
+  options.mutable_language()->AddSupportedStatementKind(googlesql::RESOLVED_CREATE_FUNCTION_STMT);
+
+  absl::StatusOr<std::unique_ptr<googlesql::SimpleCatalog>> catalog =
+      googlesql::SimpleCatalog::Deserialize(request.simple_catalog(), pools, &type_factory,
+                                            /*extended_type_deserializer=*/nullptr);
+  if (!catalog.ok()) return PackError(catalog.status().message());
+  if (!request.simple_catalog().has_builtin_function_options()) {
+    (*catalog)->AddBuiltinFunctions(googlesql::BuiltinFunctionOptions(options.language()));
+  }
+
+  const absl::string_view sql = request.sql_statement();
+  googlesql::ParseResumeLocation location = googlesql::ParseResumeLocation::FromStringView(sql);
+  // Kept for the script, since a created function may refer to its statement's resolved tree
+  std::vector<std::unique_ptr<const googlesql::AnalyzerOutput>> outputs;
+  bool at_end_of_input = false;
+  while (!at_end_of_input) {
+    std::unique_ptr<const googlesql::AnalyzerOutput> output;
+    const absl::Status status = googlesql::AnalyzeNextStatement(&location, options, catalog->get(), &type_factory,
+                                                                &output, &at_end_of_input);
+    if (!status.ok()) return PackError(status, sql);
+    const googlesql::ResolvedStatement* statement = output->resolved_statement();
+    if (statement->node_kind() == googlesql::RESOLVED_CREATE_FUNCTION_STMT) {
+      absl::StatusOr<std::unique_ptr<googlesql::Function>> function = googlesql::MakeFunctionFromCreateFunction(
+          *statement->GetAs<googlesql::ResolvedCreateFunctionStmt>(), /*function_options=*/nullptr);
+      if (!function.ok()) return PackError(function.status(), sql);
+      const std::string name = (*function)->FullName(/*include_group=*/false);
+      if (!(*catalog)->AddOwnedFunctionIfNotPresent(&*function)) {
+        return PackError(absl::StrCat("Function already exists: ", name));
+      }
+    }
+    outputs.push_back(std::move(output));
+  }
+  if (outputs.empty()) return PackError("The script has no statements");
+
+  AnalyzeResponse response;
+  response.set_resume_byte_position(location.byte_position());
+  googlesql::FileDescriptorSetMap file_descriptor_set_map;
+  const absl::Status saved =
+      outputs.back()->resolved_statement()->SaveTo(&file_descriptor_set_map, response.mutable_resolved_statement());
   if (!saved.ok()) return PackError(saved.message());
   return PackProto(response);
 }
