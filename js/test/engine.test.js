@@ -197,7 +197,7 @@ describe('format', () => {
 			lineLengthLimit: 20,
 		});
 		assert.match(formatted, /^select/);
-		assert.match(formatted, /\n {4}a\n/);
+		assert.match(formatted, /\nwhere\n {4}a > 1/);
 	});
 
 	it('formats only the given ranges', () => {
