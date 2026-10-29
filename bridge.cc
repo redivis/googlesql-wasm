@@ -37,6 +37,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/descriptor.h"
 
@@ -260,7 +261,13 @@ void* googlesql_analyze_script(const void* request_bytes, uint32_t request_size)
     std::unique_ptr<const googlesql::AnalyzerOutput> output;
     const absl::Status status = googlesql::AnalyzeNextStatement(&location, options, catalog->get(), &type_factory,
                                                                 &output, &at_end_of_input);
-    if (!status.ok()) return PackError(status, sql);
+    if (!status.ok()) {
+      // Functions from CREATE FUNCTION are in the "Lazy_resolution_function" group, which googlesql puts in front
+      //   of their names in messages
+      return PackError(absl::Status(
+          status.code(), absl::StrReplaceAll(status.message(), {{"Lazy_resolution_function:", ""}})),
+                       sql);
+    }
     const googlesql::ResolvedStatement* statement = output->resolved_statement();
     if (statement->node_kind() == googlesql::RESOLVED_CREATE_FUNCTION_STMT) {
       absl::StatusOr<std::unique_ptr<googlesql::Function>> function = googlesql::MakeFunctionFromCreateFunction(

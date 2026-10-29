@@ -197,7 +197,7 @@ describe('analyze', () => {
 		const error = catchError(() =>
 			engine.analyze('CREATE TEMP FUNCTION f(x INT64) AS (x + 1);\nSELECT f("a") FROM `p.d.t`', { tables, allowScript: true }),
 		);
-		assert.match(error.message, /No matching signature for function f.* \[at 2:8\]$/);
+		assert.match(error.message, /^No matching signature for function f\n[\s\S]* \[at 2:8\]$/);
 		assert.match(
 			catchError(() => engine.analyze('SELECT 1; SELECT 2', { tables })).message,
 			/Syntax error/,
