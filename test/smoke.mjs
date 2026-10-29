@@ -28,6 +28,7 @@ const {
 	googlesql_version,
 	googlesql_parse,
 	googlesql_analyze,
+	googlesql_analyze_script,
 	googlesql_format,
 	googlesql_free,
 	malloc,
@@ -38,6 +39,7 @@ for (const [name, value] of Object.entries({
 	googlesql_version,
 	googlesql_parse,
 	googlesql_analyze,
+	googlesql_analyze_script,
 	googlesql_format,
 	googlesql_free,
 	malloc,
@@ -93,6 +95,13 @@ assert.ok(analyzed.payload.length > 0, 'analyze returns an AnalyzeResponse');
 const unresolved = call(googlesql_analyze, stringField(5, 'SELECT * FROM missing_table'));
 assert.equal(unresolved.status, 1, 'an unknown table is reported');
 assert.match(decoder.decode(unresolved.payload), /Table not found: missing_table/);
+
+const script = call(
+	googlesql_analyze_script,
+	stringField(5, 'CREATE TEMP FUNCTION f(x INT64) AS (x + 1); SELECT f(1) AS y'),
+);
+assert.equal(script.status, 0, `analyze_script succeeds: ${decoder.decode(script.payload)}`);
+assert.ok(script.payload.length > 0, 'analyze_script returns an AnalyzeResponse');
 
 // FormatSqlRequest.sql is field 1; FormatSqlResponse.sql is field 1
 const formatted = call(googlesql_format, stringField(1, '-- note\nselect a,b from t where a>1'));

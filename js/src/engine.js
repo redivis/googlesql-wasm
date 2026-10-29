@@ -99,15 +99,17 @@ export class Engine {
 	}
 
 	// Resolves a query against the given tables and parameters, in BigQuery's dialect. Only queries are accepted (the
-	//   analyzer's default); anything else is an error, "Statement not supported: ...".
+	//   analyzer's default); anything else is an error, "Statement not supported: ...". With allowScript, sql may hold
+	//   several statements: they're analyzed in order, each CREATE [TEMP] FUNCTION defines its function for the later
+	//   statements, and the result is the last statement's.
 	//   tables: [{ name: 'a.b.c' | ['a', 'b', 'c'], columns: [{ name, type }] }], where a string name is one identifier
 	//     (what `a.b.c` in backticks refers to) and an array is a path through nested catalogs (what a.b.c refers to);
 	//     type is a BigQuery type string
 	//   parameters: [{ name, type }]
 	// Returns { kind: 'queryStmt', outputColumns: [{ name, type, sourceTable, sourceColumn }] }: the output columns,
 	//   with the table and column a pass-through column comes from. Throws a GoogleSqlError.
-	analyze(sql, { tables = [], parameters = [] } = {}) {
-		const response = this.analyzeRaw(sql, { tables, parameters });
+	analyze(sql, { tables = [], parameters = [], allowScript = false } = {}) {
+		const response = this.analyzeRaw(sql, { tables, parameters, allowScript });
 		const statement = response.result.case === 'resolvedStatement' ? unwrap(response.result.value) : null;
 		const outputColumnList = statement?.outputColumnList ?? null;
 		return {
@@ -123,7 +125,7 @@ export class Engine {
 	}
 
 	// The decoded AnalyzeResponse, for callers that need the resolved tree
-	analyzeRaw(sql, { tables = [], parameters = [] } = {}) {
+	analyzeRaw(sql, { tables = [], parameters = [], allowScript = false } = {}) {
 		const request = create(AnalyzeRequestSchema, {
 			target: { case: 'sqlStatement', value: sql },
 			options: {
@@ -133,7 +135,10 @@ export class Engine {
 		});
 		return fromBinary(
 			AnalyzeResponseSchema,
-			this.#call(this.#exports.googlesql_analyze, toBinary(AnalyzeRequestSchema, request)),
+			this.#call(
+				allowScript ? this.#exports.googlesql_analyze_script : this.#exports.googlesql_analyze,
+				toBinary(AnalyzeRequestSchema, request),
+			),
 		);
 	}
 

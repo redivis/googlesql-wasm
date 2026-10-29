@@ -72,6 +72,16 @@ describe('parse', () => {
 		assert.ok(!statement.paths.some(({ names }) => names.join('.') === 'other.table_b'), 'table paths are not column paths');
 	});
 
+	it('reports identifiers outside table paths and parameters', () => {
+		const sql = 'SELECT t.a AS `x y`, LOWER(b) FROM p.d.t AS t WHERE c = @p';
+		const [statement] = engine.parse(sql).statements;
+		const identifiers = statement.identifiers.map(({ name }) => name).sort();
+		assert.deepEqual(identifiers, ['LOWER', 'a', 'b', 'c', 't', 't', 'x y']);
+		const quoted = statement.identifiers.find(({ name }) => name === 'x y');
+		assert.equal(sql.slice(...quoted.range), '`x y`');
+		assert.equal(quoted.isQuoted, true);
+	});
+
 	it('reports aliases of subqueries and UNNEST as range variables', () => {
 		const { statements } = engine.parse('SELECT * FROM (SELECT 1 AS x) s, UNNEST([1, 2]) AS u, s.items');
 		assert.deepEqual(
@@ -172,6 +182,26 @@ describe('analyze', () => {
 		assert.match(error.message, /Table not found: `p.d.missing` \[at 1:15\]$/);
 		error = catchError(() => engine.analyze('SELECT nope FROM `p.d.t`', { tables }));
 		assert.match(error.message, /^Unrecognized name: nope.* \[at 1:8\]$/);
+	});
+
+	it('analyzes scripts with CREATE TEMP FUNCTION', () => {
+		const result = engine.analyze(
+			'CREATE TEMP FUNCTION double(x INT64) AS (x * 2);\nCREATE TEMP FUNCTION greet(s STRING) RETURNS STRING LANGUAGE js AS """return "hi " + s""";\nSELECT double(id) AS d, greet(name) AS g FROM `p.d.t`',
+			{ tables, allowScript: true },
+		);
+		assert.equal(result.kind, 'queryStmt');
+		assert.deepEqual(
+			result.outputColumns.map(({ name, type }) => `${name}:${type}`),
+			['d:INT64', 'g:STRING'],
+		);
+		const error = catchError(() =>
+			engine.analyze('CREATE TEMP FUNCTION f(x INT64) AS (x + 1);\nSELECT f("a") FROM `p.d.t`', { tables, allowScript: true }),
+		);
+		assert.match(error.message, /No matching signature for function f.* \[at 2:8\]$/);
+		assert.match(
+			catchError(() => engine.analyze('SELECT 1; SELECT 2', { tables })).message,
+			/Syntax error/,
+		);
 	});
 
 	it('only accepts queries', () => {
