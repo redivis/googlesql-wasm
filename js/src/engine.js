@@ -137,10 +137,17 @@ export class Engine {
 		);
 	}
 
-	// Reformats the statements in sql (keywords upper-cased, one clause per line). Throws a GoogleSqlError if a
-	//   statement doesn't parse.
-	format(sql) {
-		const request = create(FormatSqlRequestSchema, { sql });
+	// Reformats sql with googlesql's lenient formatter, which keeps comments and copes with SQL that doesn't fully parse.
+	//   options are the fields of googlesql.FormatterOptionsProto: lineLengthLimit (80), indentationSpaces (2),
+	//   newLineType, capitalizeKeywords (true), capitalizeFunctions, preserveLineBreaks, enforceSingleQuotes,
+	//   formatStructuredStrings, formatComments, allowInvalidTokens, expandFormatRanges. ranges limits formatting to
+	//   those [start, end) character ranges of sql. Throws a GoogleSqlError when the text can't be formatted.
+	format(sql, { ranges, ...options } = {}) {
+		const request = create(FormatSqlRequestSchema, {
+			sql,
+			options,
+			byteRanges: ranges?.map(([start, end]) => ({ start: byteOffset(sql, start), end: byteOffset(sql, end) })) ?? [],
+		});
 		const response = fromBinary(
 			FormatSqlResponseSchema,
 			this.#call(this.#exports.googlesql_format, toBinary(FormatSqlRequestSchema, request)),
@@ -168,6 +175,11 @@ export class Engine {
 		}
 		return payload;
 	}
+}
+
+const encoder = new TextEncoder();
+function byteOffset(text, charIndex) {
+	return encoder.encode(text.slice(0, charIndex)).length;
 }
 
 // A SimpleCatalogProto with each table under its name, or under nested catalogs for a path

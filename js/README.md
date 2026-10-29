@@ -67,9 +67,9 @@ engine.analyze('SELECT t.id, UPPER(name) AS upper_name FROM `p.d.t` t WHERE id I
 
 A table's `name` is one identifier (what `` `p.d.t` `` refers to) or an array for a path through nested catalogs (what `p.d.t` refers to). Types are BigQuery type strings, including `ARRAY<...>`, `STRUCT<...>` and `RANGE<...>`; `typeFromString` and `typeToString` convert them to and from `TypeProto`. Only queries are accepted, so a DML or DDL statement fails with `Statement not supported: ...`. The language is BigQuery's: every released GoogleSQL feature, in external product mode. `engine.analyzeRaw` returns the decoded `AnalyzeResponse`.
 
-### `engine.format(sql)`
+### `engine.format(sql, options)`
 
-Reformats the statements in `sql` with googlesql's parser-based formatter: keywords upper-cased, one clause per line, two-space indentation, a semicolon after each statement. It drops comments, so it suits generated SQL better than code people wrote.
+Reformats `sql` with googlesql's lenient formatter, which keeps comments and copes with SQL that doesn't fully parse (so it formats code as someone types it). `options` are the fields of `googlesql.FormatterOptionsProto`, camel-cased: `lineLengthLimit` (80), `indentationSpaces` (2), `capitalizeKeywords` (true), `capitalizeFunctions` (false), `preserveLineBreaks` (false), `newLineType`, `enforceSingleQuotes`, `formatStructuredStrings`, `formatComments` and `allowInvalidTokens`. `ranges: [[start, end], ...]` formats only those character ranges.
 
 ### `applyEdits(sql, [{ range, text }])`
 
