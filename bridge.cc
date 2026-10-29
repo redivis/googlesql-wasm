@@ -72,7 +72,9 @@ void* PackError(const absl::Status& status, absl::string_view sql) {
           .attach_error_location_payload = false,
           .stability = googlesql::ERROR_MESSAGE_STABILITY_UNSPECIFIED},
       sql, status);
-  return PackError(updated.message());
+  // Functions from CREATE FUNCTION statements are in the "Lazy_resolution_function" group, which googlesql puts in
+  //   front of their names in messages
+  return PackError(absl::StrReplaceAll(updated.message(), {{"Lazy_resolution_function:", ""}}));
 }
 
 void* PackProto(const google::protobuf::Message& message) {
@@ -261,13 +263,7 @@ void* googlesql_analyze_script(const void* request_bytes, uint32_t request_size)
     std::unique_ptr<const googlesql::AnalyzerOutput> output;
     const absl::Status status = googlesql::AnalyzeNextStatement(&location, options, catalog->get(), &type_factory,
                                                                 &output, &at_end_of_input);
-    if (!status.ok()) {
-      // Functions from CREATE FUNCTION are in the "Lazy_resolution_function" group, which googlesql puts in front
-      //   of their names in messages
-      return PackError(absl::Status(
-          status.code(), absl::StrReplaceAll(status.message(), {{"Lazy_resolution_function:", ""}})),
-                       sql);
-    }
+    if (!status.ok()) return PackError(status, sql);
     const googlesql::ResolvedStatement* statement = output->resolved_statement();
     if (statement->node_kind() == googlesql::RESOLVED_CREATE_FUNCTION_STMT) {
       absl::StatusOr<std::unique_ptr<googlesql::Function>> function = googlesql::MakeFunctionFromCreateFunction(
