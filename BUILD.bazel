@@ -9,7 +9,7 @@ cc_binary(
     srcs = ["bridge.cc"],
     copts = ["-DGOOGLESQL_WASM_VERSION=\\\"" + GOOGLESQL_VERSION + "\\\""],
     linkopts = [
-        "-sEXPORTED_FUNCTIONS=_googlesql_init,_googlesql_version,_googlesql_parse,_googlesql_analyze,_googlesql_free,_malloc,_free",
+        "-sEXPORTED_FUNCTIONS=_googlesql_init,_googlesql_version,_googlesql_parse,_googlesql_analyze,_googlesql_format,_googlesql_free,_malloc,_free",
         # A self-contained WASI module: no JavaScript glue, so the same file runs in Node and in a browser
         "-sSTANDALONE_WASM=1",
         "-sWASM_BIGINT=1",
@@ -42,6 +42,7 @@ cc_binary(
         "@googlesql//googlesql/public:language_options",
         "@googlesql//googlesql/public:parse_resume_location",
         "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:sql_formatter",
         "@googlesql//googlesql/public:type",
         "@googlesql//googlesql/resolved_ast",
         "@googlesql//googlesql/resolved_ast:serialization_cc_proto",

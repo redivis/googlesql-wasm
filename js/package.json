@@ -1,0 +1,36 @@
+{
+	"name": "@redivis/googlesql",
+	"version": "0.2.0",
+	"description": "googlesql's parser, analyzer and formatter as a WebAssembly module, for Node and browsers",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/redivis/googlesql-wasm.git",
+		"directory": "js"
+	},
+	"type": "module",
+	"exports": {
+		".": "./src/index.js",
+		"./googlesql.wasm": "./googlesql.wasm"
+	},
+	"files": [
+		"src",
+		"gen",
+		"googlesql.wasm",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=20"
+	},
+	"scripts": {
+		"generate": "buf generate",
+		"test": "node --test"
+	},
+	"dependencies": {
+		"@bufbuild/protobuf": "^2.16.0"
+	},
+	"devDependencies": {
+		"@bufbuild/buf": "^1.75.0",
+		"@bufbuild/protoc-gen-es": "^2.16.0"
+	}
+}

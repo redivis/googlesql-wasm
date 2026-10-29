@@ -28,6 +28,7 @@
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/parse_resume_location.h"
 #include "googlesql/public/simple_catalog.h"
+#include "googlesql/public/sql_formatter.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/serialization.pb.h"
@@ -40,6 +41,8 @@ namespace {
 
 using googlesql::local_service::AnalyzeRequest;
 using googlesql::local_service::AnalyzeResponse;
+using googlesql::local_service::FormatSqlRequest;
+using googlesql::local_service::FormatSqlResponse;
 using googlesql::local_service::ParseRequest;
 using googlesql::local_service::ParseResponse;
 
@@ -209,6 +212,20 @@ void* googlesql_analyze(const void* request_bytes, uint32_t request_size) {
   const absl::Status saved =
       output->resolved_statement()->SaveTo(&file_descriptor_set_map, response.mutable_resolved_statement());
   if (!saved.ok()) return PackError(saved.message());
+  return PackProto(response);
+}
+
+// FormatSqlRequest -> FormatSqlResponse. Reformats the statements in sql with googlesql's parser-based formatter (the
+//   options field is ignored, as it is by the gRPC service's FormatSql). A statement that doesn't parse is an error.
+EMSCRIPTEN_KEEPALIVE
+void* googlesql_format(const void* request_bytes, uint32_t request_size) {
+  FormatSqlRequest request;
+  if (!request.ParseFromArray(request_bytes, request_size)) {
+    return PackError("Invalid FormatSqlRequest");
+  }
+  FormatSqlResponse response;
+  const absl::Status status = googlesql::FormatSql(request.sql(), response.mutable_sql());
+  if (!status.ok()) return PackError(status, request.sql());
   return PackProto(response);
 }
 

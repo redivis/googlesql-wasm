@@ -22,9 +22,27 @@ const wasi = new WASI({ version: 'preview1', args: [], env: {} });
 const env = Object.fromEntries(imports.filter(({ module: moduleName }) => moduleName === 'env').map(({ name }) => [name, () => 0]));
 const instance = await WebAssembly.instantiate(module, { ...wasi.getImportObject(), env });
 wasi.initialize(instance);
-const { memory, googlesql_init, googlesql_version, googlesql_parse, googlesql_analyze, googlesql_free, malloc, free } =
-	instance.exports;
-for (const [name, value] of Object.entries({ googlesql_init, googlesql_version, googlesql_parse, googlesql_analyze, googlesql_free, malloc, free })) {
+const {
+	memory,
+	googlesql_init,
+	googlesql_version,
+	googlesql_parse,
+	googlesql_analyze,
+	googlesql_format,
+	googlesql_free,
+	malloc,
+	free,
+} = instance.exports;
+for (const [name, value] of Object.entries({
+	googlesql_init,
+	googlesql_version,
+	googlesql_parse,
+	googlesql_analyze,
+	googlesql_format,
+	googlesql_free,
+	malloc,
+	free,
+})) {
 	assert.equal(typeof value, 'function', `exports ${name}`);
 }
 googlesql_init();
@@ -75,5 +93,11 @@ assert.ok(analyzed.payload.length > 0, 'analyze returns an AnalyzeResponse');
 const unresolved = call(googlesql_analyze, stringField(5, 'SELECT * FROM missing_table'));
 assert.equal(unresolved.status, 1, 'an unknown table is reported');
 assert.match(decoder.decode(unresolved.payload), /Table not found: missing_table/);
+
+// FormatSqlRequest.sql is field 1; FormatSqlResponse.sql is field 1
+const formatted = call(googlesql_format, stringField(1, 'select a,b from t where a>1'));
+assert.equal(formatted.status, 0, `format succeeds: ${decoder.decode(formatted.payload)}`);
+assert.equal(formatted.payload[0], (1 << 3) | 2, 'format returns a FormatSqlResponse');
+assert.match(decoder.decode(formatted.payload.subarray(2)), /^SELECT/, 'formatted SQL is upper-cased');
 
 console.log(`ok: googlesql ${expectedVersion}, ${(bytes.length / 1048576).toFixed(1)}MB, memory ${memory.buffer.byteLength / 1048576}MB`);
