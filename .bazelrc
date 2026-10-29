@@ -26,6 +26,11 @@ build --host_copt=-no-canonical-prefixes
 
 build --java_runtime_version=remotejdk_11
 
+# scripts/bazel-build.sh collects the .proto files googlesql generates (parse_tree.proto, resolved_ast.proto, ...)
+#   from bazel-out. They are intermediate outputs, which Bazel does not materialize from the disk cache by default
+#   ("build without the bytes"), so a cached build would silently ship without them
+build --remote_download_all
+
 build --copt=-O3
 build --copt=-DNDEBUG
 

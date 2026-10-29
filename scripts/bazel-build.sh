@@ -32,6 +32,14 @@ for root in "$OUTPUT_BASE"/external/googlesql+ "$OUTPUT_BASE"/execroot/_main/baz
 done
 chmod -R u+w "$out/schemas"
 
+# The generated ones are the easiest to lose (see --remote_download_all in .bazelrc), so refuse to package without them
+for generated in googlesql/parser/parse_tree.proto googlesql/resolved_ast/resolved_ast.proto googlesql/resolved_ast/resolved_node_kind.proto; do
+	if [ ! -f "$out/schemas/$generated" ]; then
+		echo "error: generated $generated was not found under bazel-out; the build output is incomplete" >&2
+		exit 1
+	fi
+done
+
 tar -czf "$out/schemas.tar.gz" -C "$out" schemas
 (cd "$out" && sha256sum googlesql.wasm schemas.tar.gz > SHA256SUMS)
 
