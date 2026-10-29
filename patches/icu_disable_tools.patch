@@ -1,0 +1,11 @@
+--- a/bazel/icu.BUILD
++++ b/bazel/icu.BUILD
+@@ -54,7 +54,7 @@
+     configure_options = [
+         "--enable-option-checking",
+         "--enable-static",
+-        "--enable-tools",  # needed to build data
++        "--disable-tools",  # wasm: the data tools can't run when cross-compiling; the data library is stubbed
+         "--disable-shared",
+         "--disable-dyload",
+         "--disable-extras",

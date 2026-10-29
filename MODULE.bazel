@@ -1,0 +1,33 @@
+# Builds googlesql's parser and analyzer as a standalone WebAssembly module (see README.md)
+module(
+    name = "googlesql_wasm",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "rules_cc", version = "0.2.14")
+
+# The Emscripten toolchain; wasm_cc_binary applies it through a transition
+bazel_dep(name = "emsdk", version = "4.0.17")
+
+# Match googlesql's own pins (its MODULE.bazel at the commit below)
+bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf")
+bazel_dep(name = "abseil-cpp", version = "20260107.0", repo_name = "com_google_absl")
+
+# googlesql isn't on the Bazel Central Registry, so the version here is a marker and git_override supplies the source.
+#   The commit is the 2026.10.3 release (keep googlesql_version.bzl in step). The patches are the minimum for a wasm
+#   build: ICU can't run its data tools when cross-compiling, there's no tzdata for the default time zone, and a
+#   `1L << 62` that assumes a 64-bit long (wasm32's is 32 bits).
+bazel_dep(name = "googlesql", version = "2026.10.3")
+git_override(
+    module_name = "googlesql",
+    commit = "a09b0bd95dd55dba9478eb8f20a3971bc9e30b70",
+    patch_strip = 1,
+    patches = [
+        "//:patches/icu_disable_tools.patch",
+        "//:patches/analyzer_options_utc.patch",
+        "//:patches/internal_utils_int64_shift.patch",
+    ],
+    remote = "https://github.com/google/googlesql.git",
+)

@@ -1,0 +1,55 @@
+load("@emsdk//emscripten_toolchain:wasm_rules.bzl", "wasm_cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load(":googlesql_version.bzl", "GOOGLESQL_VERSION")
+
+exports_files(glob(["patches/*.patch"]))
+
+cc_binary(
+    name = "googlesql_bridge",
+    srcs = ["bridge.cc"],
+    copts = ["-DGOOGLESQL_WASM_VERSION=\\\"" + GOOGLESQL_VERSION + "\\\""],
+    linkopts = [
+        "-sEXPORTED_FUNCTIONS=_googlesql_init,_googlesql_version,_googlesql_parse,_googlesql_analyze,_googlesql_free,_malloc,_free",
+        # A self-contained WASI module: no JavaScript glue, so the same file runs in Node and in a browser
+        "-sSTANDALONE_WASM=1",
+        "-sWASM_BIGINT=1",
+        # Library mode (no main). With explicit EXPORTED_FUNCTIONS, _initialize isn't exported, so the C++ constructors
+        #   run from googlesql_init() instead
+        "-Wl,--no-entry",
+        "-sALLOW_MEMORY_GROWTH=1",
+        "-sINITIAL_MEMORY=64MB",
+        "-sMAXIMUM_MEMORY=2GB",
+        # The parser recurses deeply on long expressions (e.g., IN lists)
+        "-sSTACK_SIZE=16MB",
+        "-sASSERTIONS=0",
+        "-sUSE_PTHREADS=0",
+        "-sNO_FILESYSTEM=1",
+    ],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_protobuf//:protobuf",
+        "@googlesql//googlesql/local_service:local_service_cc_proto",
+        "@googlesql//googlesql/parser",
+        "@googlesql//googlesql/parser:parse_tree_cc_proto",
+        "@googlesql//googlesql/parser:parse_tree_serializer",
+        "@googlesql//googlesql/public:analyzer",
+        "@googlesql//googlesql/public:analyzer_options",
+        "@googlesql//googlesql/public:analyzer_output",
+        "@googlesql//googlesql/public:builtin_function_options",
+        "@googlesql//googlesql/public:error_helpers",
+        "@googlesql//googlesql/public:language_options",
+        "@googlesql//googlesql/public:parse_resume_location",
+        "@googlesql//googlesql/public:simple_catalog",
+        "@googlesql//googlesql/public:type",
+        "@googlesql//googlesql/resolved_ast",
+        "@googlesql//googlesql/resolved_ast:serialization_cc_proto",
+    ],
+)
+
+# Builds :googlesql_bridge with the Emscripten toolchain; the output is googlesql_wasm/googlesql_bridge.wasm
+wasm_cc_binary(
+    name = "googlesql_wasm",
+    cc_target = ":googlesql_bridge",
+)

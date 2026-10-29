@@ -1,0 +1,11 @@
+--- a/googlesql/public/analyzer_options.cc
++++ b/googlesql/public/analyzer_options.cc
+@@ -326,7 +326,7 @@
+                .validate_resolved_ast =
+                    absl::GetFlag(FLAGS_googlesql_validate_resolved_ast),
+                .error_message_stability = GetDefaultErrorMessageStability()})) {
+-  GOOGLESQL_CHECK_OK(FindTimeZoneByName("America/Los_Angeles",  // Crash OK
++  GOOGLESQL_CHECK_OK(FindTimeZoneByName("UTC",  // wasm: no tzdata, and UTC needs none
+                               &data_->default_timezone))
+       << "Did you need to install the tzdata package?";
+ }
