@@ -6,18 +6,20 @@
 
 Each [release](../../releases) has:
 
-- `googlesql.wasm`: the module (~24 MB; ~5 MB compressed over the wire).
+- `redivis-googlesql-<version>.tgz`: the `@redivis/googlesql` npm package: the module, the generated protobuf code, and a JavaScript API (`parse`, `analyze`, `format`) for Node and browsers. See [js/README.md](js/README.md). Depend on it by URL: `"@redivis/googlesql": "https://github.com/redivis/googlesql-wasm/releases/download/v<version>/redivis-googlesql-<version>.tgz"`.
+- `googlesql.wasm`: the module on its own (~24 MB; ~5 MB compressed over the wire).
 - `schemas.tar.gz`: the `.proto` files that define its requests and responses, including the ones googlesql generates (`parse_tree.proto`, `resolved_ast.proto`).
 - `SHA256SUMS`
 
-## Using it
+## Using the module directly
 
-The `.wasm` imports only WASI (`wasi_snapshot_preview1`) functions and two Emscripten stubs, so it loads with `node:wasi` or a small WASI shim in a browser. Exports:
+The `.wasm` imports only WASI (`wasi_snapshot_preview1`) functions and one Emscripten stub, so it loads with `node:wasi` or a small WASI shim in a browser (`js/src/wasi.js`). Exports:
 
 - `googlesql_init()`: call once, first.
 - `googlesql_version()`: the googlesql release, as a C string.
 - `googlesql_parse(ptr, size)`: a serialized `googlesql.local_service.ParseRequest` → `ParseResponse`. Set `allow_script` to parse several statements.
 - `googlesql_analyze(ptr, size)`: a serialized `AnalyzeRequest` → `AnalyzeResponse`. Declare tables (with typed columns) in `simple_catalog` and parameters in `options.query_parameters`; the resolved statement's `output_column_list` has the result schema.
+- `googlesql_format(ptr, size)`: a serialized `FormatSqlRequest` → `FormatSqlResponse`.
 - `malloc`, `free`, `googlesql_free`.
 
 Responses are a buffer of `uint32 size | uint8 status | payload`: status 0 is the response proto, 1 is a UTF-8 error message, with the location as `[at line:col]` where known. When a request leaves the language options unset, BigQuery's dialect is used (every released language feature, external product mode).
@@ -32,9 +34,9 @@ One googlesql proto (`googlesql/public/proto/vector_encoding_id.proto`) uses pro
 ./build.sh
 ```
 
-This builds the Docker image and runs the Bazel + Emscripten build in it, writing `out/`. The Bazel cache is kept in the `googlesql-wasm-bazel-cache` Docker volume, so rebuilds are incremental; a cold build takes about half an hour on an x86-64 machine (longer under emulation on Apple Silicon). The same steps run on Linux directly with `scripts/bazel-build.sh out`, which is what [the workflow](.github/workflows/build.yml) does.
+This builds the Docker image and runs the Bazel + Emscripten build in it, writing `out/`. The Bazel cache is kept in the `googlesql-wasm-bazel-cache` Docker volume, so rebuilds are incremental; a cold build takes about half an hour on an x86-64 machine (longer under emulation on Apple Silicon). The same steps run on Linux directly with `scripts/bazel-build.sh out`, which is what [the workflow](.github/workflows/build.yml) does. `scripts/package.sh out` then builds the npm package from `out/` (generating the protobuf code with `buf`, and running the package's tests).
 
-To move to a new googlesql release, update the commit in `MODULE.bazel` and the version in `googlesql_version.bzl`, and check that the patches still apply. Then tag `vX.Y.Z` to publish a release.
+To move to a new googlesql release, update the commit in `MODULE.bazel` and the version in `googlesql_version.bzl`, and check that the patches still apply. To release, set the version in `js/package.json` and tag it as `vX.Y.Z`; the workflow checks that they match.
 
 ## Patches
 

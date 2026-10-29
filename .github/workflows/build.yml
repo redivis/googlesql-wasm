@@ -39,6 +39,19 @@ jobs:
       - name: Smoke test
         run: node test/smoke.mjs out
 
+      # The npm package: generated protobuf code, the wasm, and the loader. Its version must match a release's tag.
+      - name: Package
+        run: scripts/package.sh out
+
+      - name: Check the package version against the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(node -p "require('./js/package.json').version")
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "js/package.json is version $version, but the tag is ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v7
         with:
           name: googlesql-wasm
@@ -46,6 +59,7 @@ jobs:
             out/googlesql.wasm
             out/schemas.tar.gz
             out/SHA256SUMS
+            out/redivis-googlesql-*.tgz
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -55,4 +69,5 @@ jobs:
             out/googlesql.wasm
             out/schemas.tar.gz
             out/SHA256SUMS
+            out/redivis-googlesql-*.tgz
           generate_release_notes: true

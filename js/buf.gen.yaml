@@ -1,0 +1,10 @@
+# Generates protobuf-es code for the googlesql protos into gen/, from the schemas scripts/bazel-build.sh collects.
+#   Run from js/ with `npm run generate` after a build (or after extracting a release's schemas.tar.gz to ../out).
+version: v2
+inputs:
+  - directory: ../out/schemas
+plugins:
+  - local: node_modules/.bin/protoc-gen-es
+    out: gen
+    # .js import extensions, so that the output runs in Node without a bundler
+    opt: target=js+dts,import_extension=js

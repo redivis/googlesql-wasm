@@ -3,3 +3,7 @@ out/
 /bazel-*
 MODULE.bazel.lock
 node_modules/
+# The JS package's generated code and build inputs (scripts/package.sh copies them in)
+js/gen/
+js/googlesql.wasm
+js/*.tgz
