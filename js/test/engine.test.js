@@ -182,14 +182,33 @@ describe('analyze', () => {
 });
 
 describe('format', () => {
-	it('formats SQL', () => {
-		const formatted = engine.format('select a,b from t where a>1');
-		assert.match(formatted, /^SELECT/);
+	it('formats SQL, keeping comments', () => {
+		const formatted = engine.format('-- leading\nselect a, /* inline */ b from t where a>1 # trailing');
+		assert.match(formatted, /^-- leading\nSELECT/);
+		assert.match(formatted, /\/\* inline \*\//);
+		assert.match(formatted, /# trailing/);
 		assert.match(formatted, /FROM\s+t/);
 	});
 
-	it('throws on invalid SQL', () => {
-		assert.throws(() => engine.format('SELECT FROM'), GoogleSqlError);
+	it('takes formatter options', () => {
+		const formatted = engine.format('select a from t where a > 1 and b > 2', {
+			capitalizeKeywords: false,
+			indentationSpaces: 4,
+			lineLengthLimit: 20,
+		});
+		assert.match(formatted, /^select/);
+		assert.match(formatted, /\n {4}a\n/);
+	});
+
+	it('formats only the given ranges', () => {
+		const sql = 'select 1;\nselect   2;';
+		const formatted = engine.format(sql, { ranges: [[10, sql.length]] });
+		assert.match(formatted, /^select 1;\n/);
+		assert.match(formatted, /SELECT\s+2/);
+	});
+
+	it('formats SQL that does not parse', () => {
+		assert.match(engine.format('select from where'), /^SELECT/);
 	});
 });
 

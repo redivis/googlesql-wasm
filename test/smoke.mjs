@@ -95,9 +95,9 @@ assert.equal(unresolved.status, 1, 'an unknown table is reported');
 assert.match(decoder.decode(unresolved.payload), /Table not found: missing_table/);
 
 // FormatSqlRequest.sql is field 1; FormatSqlResponse.sql is field 1
-const formatted = call(googlesql_format, stringField(1, 'select a,b from t where a>1'));
+const formatted = call(googlesql_format, stringField(1, '-- note\nselect a,b from t where a>1'));
 assert.equal(formatted.status, 0, `format succeeds: ${decoder.decode(formatted.payload)}`);
 assert.equal(formatted.payload[0], (1 << 3) | 2, 'format returns a FormatSqlResponse');
-assert.match(decoder.decode(formatted.payload.subarray(2)), /^SELECT/, 'formatted SQL is upper-cased');
+assert.match(decoder.decode(formatted.payload.subarray(2)), /^-- note\nSELECT/, 'formatted SQL keeps comments and upper-cases keywords');
 
 console.log(`ok: googlesql ${expectedVersion}, ${(bytes.length / 1048576).toFixed(1)}MB, memory ${memory.buffer.byteLength / 1048576}MB`);

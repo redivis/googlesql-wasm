@@ -1,6 +1,6 @@
 {
 	"name": "@redivis/googlesql",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "googlesql's parser, analyzer and formatter as a WebAssembly module, for Node and browsers",
 	"license": "MIT",
 	"repository": {

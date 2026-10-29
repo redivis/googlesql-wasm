@@ -27,8 +27,9 @@
 #include "googlesql/public/language_options.h"
 #include "googlesql/public/options.pb.h"
 #include "googlesql/public/parse_resume_location.h"
+#include "googlesql/public/formatter_options.h"
+#include "googlesql/public/lenient_formatter.h"
 #include "googlesql/public/simple_catalog.h"
-#include "googlesql/public/sql_formatter.h"
 #include "googlesql/public/type.h"
 #include "googlesql/resolved_ast/resolved_ast.h"
 #include "googlesql/resolved_ast/serialization.pb.h"
@@ -215,17 +216,26 @@ void* googlesql_analyze(const void* request_bytes, uint32_t request_size) {
   return PackProto(response);
 }
 
-// FormatSqlRequest -> FormatSqlResponse. Reformats the statements in sql with googlesql's parser-based formatter (the
-//   options field is ignored, as it is by the gRPC service's FormatSql). A statement that doesn't parse is an error.
+// FormatSqlRequest -> FormatSqlResponse, like the gRPC service's LenientFormatSql: googlesql's token-based formatter,
+//   which keeps comments and formats SQL that doesn't fully parse, with the request's options (line length,
+//   indentation, keyword capitalization, ...) and, when byte_ranges is set, only those parts of the text.
 EMSCRIPTEN_KEEPALIVE
 void* googlesql_format(const void* request_bytes, uint32_t request_size) {
   FormatSqlRequest request;
   if (!request.ParseFromArray(request_bytes, request_size)) {
     return PackError("Invalid FormatSqlRequest");
   }
+  const googlesql::FormatterOptions options(request.options());
+  std::vector<googlesql::FormatterRange> ranges;
+  ranges.reserve(request.byte_ranges_size());
+  for (const auto& range : request.byte_ranges()) {
+    ranges.push_back(googlesql::FormatterRange{.start = range.start(), .end = range.end()});
+  }
+  const absl::StatusOr<std::string> formatted =
+      googlesql::LenientFormatSqlByteRanges(request.sql(), ranges, options);
+  if (!formatted.ok()) return PackError(formatted.status(), request.sql());
   FormatSqlResponse response;
-  const absl::Status status = googlesql::FormatSql(request.sql(), response.mutable_sql());
-  if (!status.ok()) return PackError(status, request.sql());
+  response.set_sql(*formatted);
   return PackProto(response);
 }
 
