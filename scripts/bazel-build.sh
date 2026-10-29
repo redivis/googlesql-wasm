@@ -27,7 +27,8 @@ rm -rf "$out/schemas"
 mkdir -p "$out/schemas"
 for root in "$OUTPUT_BASE"/external/googlesql+ "$OUTPUT_BASE"/execroot/_main/bazel-out/*/bin/external/googlesql+; do
 	if [ -d "$root/googlesql" ]; then
-		(cd "$root" && find googlesql -name '*.proto' -type f -exec cp --parents {} "$out/schemas/" \;)
+		# googlesql/testdata holds deliberately invalid protos for googlesql's own tests
+		(cd "$root" && find googlesql -path googlesql/testdata -prune -o -name '*.proto' -type f -exec cp --parents {} "$out/schemas/" \;)
 	fi
 done
 chmod -R u+w "$out/schemas"
