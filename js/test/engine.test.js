@@ -204,6 +204,26 @@ describe('analyze', () => {
 		);
 	});
 
+	it("resolves BigQuery's aliases of INT64 wherever a type is named", () => {
+		for (const alias of ['INT', 'SMALLINT', 'INTEGER', 'BIGINT', 'TINYINT', 'BYTEINT', 'integer']) {
+			const result = engine.analyze(
+				`CREATE TEMP FUNCTION f(x ${alias}) RETURNS ${alias} AS (x + 1);\nSELECT CAST(name AS ${alias}) AS a, SAFE_CAST(name AS ${alias}) AS b, ARRAY<${alias}>[1][OFFSET(0)] AS c, CAST(STRUCT(1 AS v) AS STRUCT<v ${alias}>).v AS d, f(id) AS e FROM \`p.d.t\``,
+				{ tables, allowScript: true },
+			);
+			assert.deepEqual(
+				result.outputColumns.map(({ name, type }) => `${name}:${type}`),
+				['a:INT64', 'b:INT64', 'c:INT64', 'd:INT64', 'e:INT64'],
+			);
+		}
+		// A column or alias with one of those names is still just a name
+		assert.deepEqual(
+			engine.analyze('SELECT id AS `int`, id AS integer FROM `p.d.t`', { tables }).outputColumns.map(({ name }) => name),
+			['int', 'integer'],
+		);
+		// FLOAT isn't a type in BigQuery's SQL either
+		assert.match(catchError(() => engine.analyze('SELECT CAST(name AS FLOAT) FROM `p.d.t`', { tables })).message, /^Type not found: FLOAT \[at 1:21\]$/);
+	});
+
 	it('only accepts queries', () => {
 		const error = catchError(() => engine.analyze('CREATE TEMP FUNCTION f(x INT64) AS (x + 1)'));
 		assert.match(error.message, /Statement not supported: CreateFunctionStatement/);

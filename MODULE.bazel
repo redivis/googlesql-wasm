@@ -4,25 +4,35 @@ module(
     version = "0.1.0",
 )
 
-bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "bazel_skylib", version = "1.8.1")
-bazel_dep(name = "rules_cc", version = "0.2.14")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
+bazel_dep(name = "rules_cc", version = "0.2.22")
 
 # The Emscripten toolchain; wasm_cc_binary applies it through a transition
-bazel_dep(name = "emsdk", version = "4.0.17")
+bazel_dep(name = "emsdk", version = "5.0.7")
 
 # Match googlesql's own pins (its MODULE.bazel at the commit below)
-bazel_dep(name = "protobuf", version = "33.4", repo_name = "com_google_protobuf")
-bazel_dep(name = "abseil-cpp", version = "20260107.0", repo_name = "com_google_absl")
+bazel_dep(name = "protobuf", version = "37.0-rc3", repo_name = "com_google_protobuf")
+bazel_dep(name = "abseil-cpp", version = "20260817.0", repo_name = "com_google_absl")
+
+# googlesql's code generators need Python 3.11 (its pip wheels are locked to it), and only the root module's default
+#   toolchain counts; without this, the default is the newer Python that emsdk registers
+bazel_dep(name = "rules_python", version = "2.4.1")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.11",
+)
 
 # googlesql isn't on the Bazel Central Registry, so the version here is a marker and git_override supplies the source.
-#   The commit is the 2026.10.3 release (keep googlesql_version.bzl in step). The patches are the minimum for a wasm
+#   The commit is the 2026.11.3 release (keep googlesql_version.bzl in step). The patches are the minimum for a wasm
 #   build: ICU can't run its data tools when cross-compiling, there's no tzdata for the default time zone, and a
 #   `1L << 62` that assumes a 64-bit long (wasm32's is 32 bits).
-bazel_dep(name = "googlesql", version = "2026.10.3")
+bazel_dep(name = "googlesql", version = "2026.11.3")
 git_override(
     module_name = "googlesql",
-    commit = "a09b0bd95dd55dba9478eb8f20a3971bc9e30b70",
+    commit = "762ca7a16f2b555c85b6f9250c713a82bd1052d6",
     patch_strip = 1,
     patches = [
         "//:patches/icu_disable_tools.patch",

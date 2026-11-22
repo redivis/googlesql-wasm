@@ -188,8 +188,17 @@ function byteOffset(text, charIndex) {
 }
 
 // A SimpleCatalogProto with each table under its name, or under nested catalogs for a path
+// BigQuery's aliases of INT64, which googlesql doesn't define (of BigQuery's type aliases, it knows BOOLEAN, DECIMAL and
+//   BIGDECIMAL). Declared to the analyzer as named types of the catalog, so that they resolve wherever a query names a
+//   type: CAST, typed literals, ARRAY<...> and STRUCT<...>, and a function's arguments and return type
+const INT64_ALIASES = ['INT', 'SMALLINT', 'INTEGER', 'BIGINT', 'TINYINT', 'BYTEINT'];
+
 function buildCatalog(tables) {
-	const root = { table: [], catalog: [] };
+	const root = {
+		table: [],
+		catalog: [],
+		namedType: INT64_ALIASES.map((name) => ({ name, type: typeFromString('INT64') })),
+	};
 	const catalogsByName = new Map();
 	for (const { name, columns } of tables) {
 		const path = Array.isArray(name) ? name : [name];

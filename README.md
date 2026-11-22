@@ -37,7 +37,7 @@ One googlesql proto (`googlesql/public/proto/vector_encoding_id.proto`) uses pro
 
 This builds the Docker image and runs the Bazel + Emscripten build in it, writing `out/`. The Bazel cache is kept in the `googlesql-wasm-bazel-cache` Docker volume, so rebuilds are incremental; a cold build takes about half an hour on an x86-64 machine (longer under emulation on Apple Silicon). The same steps run on Linux directly with `scripts/bazel-build.sh out`, which is what [the workflow](.github/workflows/build.yml) does. `scripts/package.sh out` then builds the npm package from `out/` (generating the protobuf code with `buf`, and running the package's tests).
 
-To move to a new googlesql release, update the commit in `MODULE.bazel` and the version in `googlesql_version.bzl`, and check that the patches still apply. To release, set the version in `js/package.json` and tag it as `vX.Y.Z`; the workflow checks that they match.
+To move to a new googlesql release, update the commit in `MODULE.bazel` and the version in `googlesql_version.bzl`, match what that release's own `MODULE.bazel` and `.bazelversion` pin (Bazel, protobuf, abseil, the default Python toolchain), and check that the patches still apply. `bazel build --nobuild //:googlesql_wasm` checks all of that in a couple of minutes, before the long compile. To release, set the version in `js/package.json` and tag it as `vX.Y.Z`; the workflow checks that they match.
 
 ## Patches
 
