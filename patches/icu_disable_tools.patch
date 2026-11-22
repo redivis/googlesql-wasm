@@ -1,6 +1,6 @@
 --- a/bazel/icu.BUILD
 +++ b/bazel/icu.BUILD
-@@ -54,7 +54,7 @@
+@@ -55,7 +55,7 @@
      configure_options = [
          "--enable-option-checking",
          "--enable-static",
